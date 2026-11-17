@@ -1,125 +1,113 @@
 # Indian Vegetation Fire Prediction
 
-**Machine Learning-Based 72-Hour Vegetation & Forest Fire Risk Prediction and Climate Intelligence for India**  
-*Course: **ES 335 — Machine Learning** (Undergraduate Deliverable)*  
-*Institution: **Indian Institute of Technology (IIT) Gandhinagar***
+**72-Hour Forest & Vegetation Fire Risk Prediction Across India Using Machine Learning**  
+*Course: **ES 335 — Machine Learning** | **Indian Institute of Technology (IIT) Gandhinagar***
+
+- **Live Interactive Website (GitHub Pages):** [https://karthikchandra15.github.io/ML-Project---India_Fire_Climate_Prediction/](https://karthikchandra15.github.io/ML-Project---India_Fire_Climate_Prediction/)
+- **Source Code Repository:** [https://github.com/KarthikChandra15/ML-Project---India_Fire_Climate_Prediction](https://github.com/KarthikChandra15/ML-Project---India_Fire_Climate_Prediction)
 
 ---
 
-## 1. Project Summary & Core Research Question
+## 1. Problem Statement & Motivation
 
-**Research Question:**  
-> *Given antecedent meteorological reanalysis up to day $D$ (in Indian Standard Time, $\text{UTC}+05:30$), cumulative multi-day drought memory, fractional land-cover composition, seasonal harmonic indicators, and trailing active-fire persistence, what is the calibrated probability $P(Y_{i,D}^{(72\text{h})} = 1 \mid \mathbf{X}_{i, \le D})$ that a $0.25^\circ \times 0.25^\circ$ ($\approx 27.8\text{ km} \times 27.8\text{ km}$) Indian forest grid cell $i$ will experience at least one satellite-confirmed forest fire during the forward 72-hour window $[D+1, D+2, D+3]$ IST?*
+### What We Are Predicting
+> **Given daily weather data, recent rainfall, land-cover fractions, and active fire history up to `23:59 IST` on day `D`, what is the probability that a `0.25° × 0.25°` (~27.8 km × 27.8 km) forest grid cell in India will have at least one forest fire during the next 72 hours (`[D+1, D+2, D+3]` IST)?**
 
-### Headline Experimental Findings (Executed in Google Colab Pro — T4 High-RAM)
+### Why This Problem Matters
+1. **Satellites are reactive, not predictive:** NASA satellites (MODIS and VIIRS) only detect fires *after* they start burning. Forest departments need a **3-day early warning** to position crews before a fire spreads.
+2. **Satellites mix up crop burning and forest fires:** In India, about **20.5%** of all satellite fire detections are farmers burning leftover crop residue after harvest. If we train a model on raw satellite points without filtering, it learns farm burning schedules instead of forest fire risk.
 
-| Metric / Stage | Executed Result |
+---
+
+## 2. Summary of Key Results (Executed in Google Colab Pro — T4 GPU)
+
+| Stage / Metric | Result |
 | :--- | :--- |
-| **Raw ERA5 Archive Audited** | **3,939,700 GRIB messages** across **39 files** (`1947–2026`, $0.25^\circ \times 0.25^\circ$ India domain $[6^\circ\text{N}–38^\circ\text{N}, 68^\circ\text{E}–98^\circ\text{E}]$) |
-| **NASA FIRMS Detections Acquired** | **2,806,767 raw hotspots** $\to$ **2,216,077 deduplicated detections** (`1,682,607` VIIRS + `533,470` MODIS; `590,690` swath duplicates removed) |
-| **3-Class Fire Attribution (`485,173` active grid-days)** | **`1,045,032` (`47.16%`) Forest Fires** · **`453,496` (`20.46%`) Agricultural Residue Fires** · **`717,549` (`32.38%`) Uncertain/Mosaic** |
-| **Supervised Spatiotemporal Dataset** | **`8,920,576` total forest grid-day rows** (`1,348` days $\times$ `9,728` valid forest cells); **`450,000`-row stratified benchmark** (`150,000` per split) |
-| **Holdout Test Champion (`dl_convgru`)** | **Test PR-AUC = `0.80280`** · **ROC-AUC = `0.98201`** · **F1 = `0.73284`** (**+81.8% PR-AUC** over Climatology baseline `0.44159`) |
-| **Validation Champion (`dl_spatiotemporal_unet`)** | **Validation PR-AUC = `0.69442`** · **Test PR-AUC = `0.79450`** · **ROC-AUC = `0.98065`** · **F1 = `0.72529`** |
-| **Best Calibrated Tabular Model (`lightgbm`)** | **Test PR-AUC = `0.79300`** · **ROC-AUC = `0.98059`** · **Brier = `0.03103`** · **ECE = `0.01908`** · **Pod = `63.79%`** at **FAR = `1.44%`** |
-| **Spatial Generalization (LOEO across 8 Ecoregions)** | **Mean Unseen-Ecoregion PR-AUC = `0.6599`** · **Mean ROC-AUC = `0.9562`** (without lat/lon coordinates) |
-| **Automated Verification Suite (`UT-01..06`, `IT-01`)** | **`7 / 7` Checks PASSED (`0` failures)** |
+| **ERA5 Weather Data Processed** | **3,939,700 GRIB records** across **39 files** (`1947–2026`, covering India `6°N–38°N, 68°E–98°E`) |
+| **NASA FIRMS Satellite Detections** | **2,806,767 raw points** → **2,216,077 unique fires** (`590,690` duplicate overlapping satellite passes removed) |
+| **Forest vs. Crop Fire Separation** | **1,045,032 (`47.16%`) Forest Fires** · **453,496 (`20.46%`) Crop Fires** · **717,549 (`32.38%`) Uncertain/Mixed** |
+| **Supervised ML Dataset Size** | **8,920,576 total forest cell-days** (`9,728` forest cells); **450,000 stratified benchmark rows** (`150K` Train, `150K` Val, `150K` Test) |
+| **Best Overall Model (`ConvGRU`)** | **Test PR-AUC = `0.8028`** · **ROC-AUC = `0.9820`** · **F1 = `0.7328`** (**+81.8% higher PR-AUC** than Climatology baseline `0.4416`) |
+| **Best Validation Model (`U-Net`)** | **Validation PR-AUC = `0.6944`** · **Test PR-AUC = `0.7945`** · **ROC-AUC = `0.9807`** · **F1 = `0.7253`** |
+| **Best Tabular Model (`LightGBM`)** | **Test PR-AUC = `0.7930`** · **ROC-AUC = `0.9806`** · **Brier Score = `0.0310`** · **Calibration Error (ECE) = `0.0191`** |
+| **Unseen Region Generalization (`LOEO`)** | **Mean PR-AUC = `0.6599`** · **Mean ROC-AUC = `0.9562`** across 8 held-out Indian ecoregions |
+| **Automated Verification Checks** | **`7 / 7` Unit & Integration Tests PASSED (`0` failures)** |
 
 ---
 
-## 2. Live Interactive Website & Local Preview Instructions
+## 3. Data Sources, Preprocessing & Anti-Leakage Steps
 
-The interactive ES 335 showcase website is located in [`website/index.html`](website/index.html) and comes pre-bundled with all real JSON/GeoJSON experimental outputs in [`website/data/`](website/data/).
+### 3.1 Data Sources
+1. **ECMWF ERA5 Weather Reanalysis (`1947–2026`):** Hourly 0.25° gridded records of 2m temperature (`t2m`), 2m dewpoint (`d2m`), 10m wind components (`u10`, `v10`), total precipitation (`tp`), and surface solar radiation (`ssrd`).
+2. **NASA FIRMS Active Fire Archive (`2000–2025`):** Active fire detections from **MODIS Collection 6.1** (1 km resolution) and **VIIRS S-NPP** (375 m resolution), combined with ESA WorldCover / MODIS IGBP forest and cropland fractions.
 
-### Features Included on the Interactive Website
-- **ES 335 100-Point Rubric Navigator:** One-click jump cards mapped to all 10 grading criteria (80 pts Shared ML Reasoning + 20 pts Undergraduate Deliverable).
-- **2 Architectural & Methodological SVG Flowcharts:**
-  1. End-to-End 5-Stage Pipeline Architecture (ERA5 GRIB + NASA FIRMS $\to$ Attribution $\to$ Leak-Free 72h Engineering $\to$ 9 Models $\to$ Interactive Portal).
-  2. 5-Factor Fire Attribution Decision Flow & 3-Day Embargo Temporal Split Diagram.
-- **10 Interactive Chart.js Scientific Graphs:** Attribution Sensitivity, Ecoregion Fire Rates, 9-Model Benchmark PR-AUC, Precision–Recall Curves, Calibration Reliability Diagram, Deep Learning Training Curves, SHAP Feature Importance, Leave-One-Ecoregion-Out (LOEO) Spatial Generalization, and 1947–2020 Climate Baseline Trends.
-- **3 Useful Interactive Scientific Tools (Criterion 9):**
-  1. **Interactive $0.25^\circ$ India Geospatial Explorer & Cell Inspector (Leaflet):** Filter by model (`Calibrated LightGBM`, `Spatiotemporal U-Net`, `Hybrid Ensemble`), probability threshold, and ecoregion; click any cell to inspect its coordinates, ecoregion, $\text{VPD}_{\max}$, $\text{FFWI}_{\max}$, and calibrated 72h risk.
-  2. **Interactive Operational Alert Threshold ($\theta$) & Confusion Matrix Simulator:** Drag the alert threshold $\theta \in [0.05, 0.90]$ to inspect real-time changes in `TP`, `FP`, `FN`, `TN`, `Precision`, `Recall (POD)`, `False Alarm Rate (FAR)`, and `F1` across the $N = 150,000$ holdout test grid-days.
-  3. **Interactive Physical Fire-Weather "What-If" Sandbox:** Adjust $T_{\max}$, $\text{RH}_{\min}$, 10m Wind Speed, 7-day Rainfall, and 7-day Fire Persistence to compute live Tetens $\text{VPD}$, Fosberg $\text{FFWI}$, and 72-hour forest-fire probability.
-
-### How to Open the Website Locally
-Because the website loads JSON/GeoJSON files via `fetch('data/...')`, serve the `website/` folder over a local HTTP server (or simply run [`open_website.bat`](open_website.bat) on Windows):
-
-```bash
-# Option A: Python built-in HTTP server (recommended)
-cd website
-python -m http.server 8080
-# Then open http://localhost:8080 in your browser
-```
-
-```bash
-# Option B: Node.js npx serve
-npx serve website -l 8080
-```
-
-### How to Publish to GitHub Pages
-1. Push this repository to GitHub (`main` branch).
-2. In your GitHub repository, navigate to **Settings $\to$ Pages**, or run Cell 19 in [`India_Fire_Climate_Intelligence.ipynb`](India_Fire_Climate_Intelligence.ipynb) with `GITHUB_REPO_SLUG = "<username>/<repo>"` and `APPROVE_GITHUB_PAGES_DEPLOY = True` (using `GITHUB_TOKEN` in Google Colab Secrets), which automatically deploys `website/` to the `gh-pages` branch with `.nojekyll`.
+### 3.2 How We Processed the Data & Prevented Data Leakage
+- **Time-Zone Alignment (`UTC+05:30` IST):** Shifted all hourly UTC weather records and satellite timestamps to **Indian Standard Time (IST)** before computing daily min/mean/max values, so afternoon fire weather matches afternoon satellite passes.
+- **Duplicate Removal:** Found that `data_5.grib` and `data_6.grib` were 100% identical (`35,064` solar records) and removed `70,135` overlapping GRIB messages. Also removed `590,690` duplicate detections where two satellite passes saw the same fire within `0.01°` (~1.1 km) and 15 minutes.
+- **5-Factor Forest vs. Crop Fire Filter:** Separated real forest fires (`Y = 1`) from agricultural crop burning (`Y = 0`) using static flare filtering, detection confidence (`≥ 0.30`), forest cover (`≥ 30%`), cropland cover (`≥ 50%`), and harvest burning windows (Oct–Nov and Mar–May).
+- **Engineered Fire-Weather Features (strictly up to Day `D`):** Computed **Vapor Pressure Deficit (`VPD`, in kPa)** for air dryness, **Fosberg Fire Weather Index (`FFWI`)** for heat + wind + humidity danger, rolling `3/7/14/30-day` rainfall totals, consecutive dry days, and `1/3/7-day` recent fire counts.
+- **Chronological Split with 3-Day Embargo Gaps (Buffer Days):**
+  - **Train:** `2003–2011` (`150,000` rows)
+  - **Validation:** `2012–2015` (`150,000` rows — used for hyperparameter tuning, isotonic probability calibration, and picking the alert threshold `θ = 0.324`)
+  - **Holdout Test:** `2016–2025` (`150,000` rows — evaluated once at the end)
+  - **3-Day Embargo Gap (Buffer):** Because our target looks 3 days ahead (`[D+1, D+2, D+3]`), we skip a **3-day buffer gap** at the boundary between Train, Validation, and Test sets so a 3-day prediction window at the end of Training never overlaps into Validation or Test.
+- **No Fake Zero-Imputation:** The 1997–2008 10m wind gap in our ERA5 archive is kept as `NaN` rather than filling fake `0.0` wind speeds. All feature scalers are fit **only on the Training split**.
 
 ---
 
-## 3. Code Location & Repository Structure
+## 4. Models Compared (9 Models Across 3 Families)
 
-| Path | Description |
-| :--- | :--- |
-| [`India_Fire_Climate_Intelligence.ipynb`](India_Fire_Climate_Intelligence.ipynb) | **Master Self-Contained Google Colab Pro Notebook** (42 cells, Sections 0–20). Automatically writes all 19 modular Python files into `src/ifci/` and executes the full pipeline with `PipelineState` checkpoints. |
-| [`colab_project/modules/ifci/`](colab_project/modules/ifci/) | **Modular Python Source Package (`ifci` v3.0.0 — 19 modules):**<br>• `config.py`, `utils.py`, `runtime.py`, `state.py` — Configuration, IST utilities, hardware profiler, atomic state manager.<br>• `audit.py`, `era5.py`, `climate.py` — Pure-Python binary GRIB1/GRIB2 scanner, streaming IST daily Zarr builder, Tetens VPD & Fosberg FWI physics, 1947–2000 baseline.<br>• `firms.py`, `landcover.py`, `attribution.py` — NASA FIRMS API downloader, swath deduplication, ESA WorldCover/MODIS IGBP forest/crop masks, 5-factor attribution engine.<br>• `features.py`, `eda.py` — Leak-free 72h target engineering, 3-day temporal embargo splits, EDA tables.<br>• `models_ml.py`, `models_dl.py` — Climatology, 7d Persistence, Logistic Regression, Random Forest, LightGBM, XGBoost, and PyTorch `ConvLSTM`, `ConvGRU`, `Spatiotemporal U-Net`.<br>• `evaluation.py`, `prediction.py` — Spatiotemporal block-bootstrap CIs, LOEO spatial holdout, SHAP, feature-family ablations, 72h map generator.<br>• `visualization.py`, `deploy.py`, `verification.py` — Publication figures, interactive website builder, GitHub Pages publisher, and 7-check automated test suite. |
-| [`website/`](website/) | **Interactive ES 335 Research Website Bundle:**<br>• [`website/index.html`](website/index.html) — Self-contained interactive dashboard (flowcharts, 10 Chart.js graphs, 3 interactive simulators, ES 335 rubric map).<br>• [`website/data/project_summary.json`](website/data/project_summary.json) — Complete experimental metrics, PR/calibration curves, SHAP, LOEO, and climate trends.<br>• [`website/data/latest_72h_prediction.json`](website/data/latest_72h_prediction.json) — 72-hour forest-fire probability forecasts across 3,500 Indian forest grid cells.<br>• [`website/data/active_fire_monitor.geojson`](website/data/active_fire_monitor.geojson) — Attributed active-fire GeoJSON detections (`forest_fire`, `agricultural_fire`, `other_or_uncertain`). |
-| [`FINAL_RESEARCH_REPORT.md`](FINAL_RESEARCH_REPORT.md) | **Complete 21-Section Final Research Report** with all tables, physical equations, error analyses, and ablation results. |
-| [`SCIENTIFIC_METHODOLOGY.md`](SCIENTIFIC_METHODOLOGY.md) | Formal mathematical specification of Tetens VPD, Fosberg FWI, 5-factor fire attribution, leak-free 72h target alignment, and block-bootstrap inference. |
-| [`CODE_AUDIT_V2.md`](CODE_AUDIT_V2.md) & [`VALIDATION_REPORT.md`](VALIDATION_REPORT.md) | Binary GRIB1 header audit across all 39 ERA5 files (`3,939,700` messages) and verification suite logs. |
-| [`EXECUTION_GUIDE.md`](EXECUTION_GUIDE.md) | Step-by-step instructions for running or resuming any stage in Google Colab Pro. |
+| Model | Family | Validation PR-AUC | Holdout Test PR-AUC | Holdout Test ROC-AUC | Holdout Test F1 | Holdout Brier Score |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| `dl_convgru` | 3D Deep Learning | `0.6901` | **`0.8028`** | **`0.9820`** | **`0.7328`** | `0.0636` |
+| `dl_spatiotemporal_unet` | 3D Deep Learning | **`0.6944`** | `0.7945` | `0.9807` | `0.7253` | `0.0697` |
+| `dl_convlstm` | 3D Deep Learning | `0.6908` | `0.7940` | `0.9810` | `0.7257` | `0.0659` |
+| `lightgbm` (Calibrated) | Tabular ML | `0.6679` | `0.7930` | `0.9806` | `0.7022` | **`0.0310`** |
+| `xgboost` (Calibrated) | Tabular ML | `0.6609` | `0.7929` | `0.9808` | `0.7085` | `0.0314` |
+| `random_forest` | Tabular ML | `0.6475` | `0.7866` | `0.9794` | `0.6983` | `0.0319` |
+| `logistic_regression` | Tabular ML | `0.6361` | `0.7596` | `0.9721` | `0.6907` | `0.0324` |
+| `persistence_7d_baseline` | Domain Baseline | `0.5512` | `0.6486` | `0.9316` | `0.6725` | `0.0499` |
+| `climatology_baseline` | Domain Baseline | `0.3614` | `0.4416` | `0.8121` | `0.5101` | `0.0649` |
 
----
-
-## 4. Data Access, Setup & Rebuild Instructions
-
-### 4.1 Data Sources & Access Instructions
-1. **ECMWF ERA5 Hourly Reanalysis (`1947–2026`, $0.25^\circ \times 0.25^\circ$ India Domain):**
-   - **Source:** Copernicus Climate Data Store (CDS) — *ERA5 hourly data on single levels from 1940 to present* (`reanalysis-era5-single-levels`, Hersbach et al., 2020).
-   - **Variables Used:** `2m_temperature` (`t2m`), `2m_dewpoint_temperature` (`d2m`), `10m_u_component_of_wind` (`u10`), `10m_v_component_of_wind` (`v10`), `total_precipitation` (`tp`), and `surface_solar_radiation_downwards` (`ssrd`).
-   - **Google Drive Path:** Place the 39 raw `.grib` archive files (`data_0.grib` through `data_16.grib`, `1991-1993.grib` through `2025-2026.grib`) inside `/content/drive/MyDrive/machine learning/`.
-   - **Pre-Computed Website Outputs:** All aggregated JSON/GeoJSON outputs required to view and interact with the website are already committed inside [`website/data/`](website/data/) (`< 2 MB` total), so **graders do not need to download the 21 GB raw GRIB archive to inspect or rebuild the interactive website**.
-
-2. **NASA FIRMS Active-Fire Archive (`2000–2025`):**
-   - **Source:** NASA Fire Information for Resource Management System (FIRMS) API (`/api/area/csv/{FIRMS_MAP_KEY}/{SOURCE}/68,6,98,38/{DAY_RANGE}/{DATE}`) covering `MODIS_SP` (Collection 6.1, 1 km) and `VIIRS_SNPP_SP` (375 m).
-   - **Credential Handling:** Obtain a free API Map Key at [https://firms.modaps.eosdis.nasa.gov/api/](https://firms.modaps.eosdis.nasa.gov/api/) and store it in **Google Colab Secrets (`🔑`)** under the key name `FIRMS_MAP_KEY`. No API keys or tokens are ever hardcoded in source code or committed to the repository (`zero_credentials_or_tokens_in_bundle = true`).
-
-### 4.2 Rebuilding the Website Locally (Without Re-Running Multi-Hour Colab Training)
-To rebuild [`website/index.html`](website/index.html) from [`website/data/project_summary.json`](website/data/project_summary.json):
-```bash
-node colab_project/build_es335_showcase_website.js
-```
-
-### 4.3 Full End-to-End Rebuild in Google Colab Pro
-1. Open [`India_Fire_Climate_Intelligence.ipynb`](India_Fire_Climate_Intelligence.ipynb) in **Google Colab Pro** (`T4` or `L4` GPU, High-RAM enabled).
-2. Mount Google Drive at `/content/drive` and ensure `FIRMS_MAP_KEY` is added in Colab Secrets (`🔑`).
-3. Run **Sections 0–20** sequentially. Every stage writes atomic checkpoints to `/content/drive/MyDrive/India_Fire_Climate_Intelligence/state/pipeline_state.json`, so completed stages automatically resume if a Colab session disconnects.
-4. Run **Section 20 (`verification.run_verification_suite()`)** to verify all 7 unit and integration checks (`UT-01` through `UT-06` and `IT-01`).
+### Why We Use `PR-AUC`, `Brier Score`, and `ECE` Instead of Raw Accuracy
+Only **7.47%** of forest grid-days on the holdout test set have a fire (`92.53%` are non-fire days). A dummy model that always predicts "no fire" gets **92.53% accuracy** while catching zero fires. Therefore, we evaluate models using:
+- **`PR-AUC` (Precision–Recall Area Under Curve):** Measures how well the model catches rare fires without raising false alarms.
+- **`Brier Score` & `ECE` (Expected Calibration Error):** Measure whether a predicted probability (e.g., `30%` risk) matches real-world fire frequency (`0.0` is perfect).
 
 ---
 
-## 5. AI-Use Disclosure & External Citations (ES 335 Requirement)
+## 5. Code Location, Data Access & How to Rebuild
 
-### 5.1 AI-Use Disclosure
-In accordance with the **ES 335 (IIT Gandhinagar)** course policy on transparency and academic integrity, we disclose the following use of AI assistance during this project:
-- **AI Tools Used:** Google Antigravity (Gemini-powered agentic coding assistant) was used to assist with:
-  1. Refactoring the 19 modular Python scripts in `src/ifci/` for memory-safe streaming of the 39 ERA5 GRIB files (`3,939,700` messages) within Google Colab's disk/RAM constraints.
-  2. Debugging API pagination (`5-day` chunking for NASA FIRMS `/api/area/csv/`) and timezone alignment (`UTC+05:30` IST naive vs. aware timestamps).
-  3. Structuring the HTML/CSS/SVG/Chart.js/Leaflet interactive research portal (`website/index.html`) and formatting documentation tables.
-- **Student Ownership & Verification:** All research questions, temporal split choices (`2003–2011` Train, `2012–2015` Validation, `2016–2025` Holdout Test with 3-day embargo windows), physical fire-weather formulations (Tetens VPD, Fosberg FWI), 5-factor forest vs. agricultural fire attribution criteria, execution of all 20 pipeline stages on real ERA5 and NASA FIRMS data in Google Colab Pro, and interpretation of errors and limitations were verified and validated by the project authors. Every numeric metric reported on the website and in the report is produced directly by the executed Colab pipeline and verified by the automated test suite (`7/7 PASSED`).
+### 5.1 Repository Files
+- [`index.html`](index.html) — Self-contained interactive ES 335 website (includes the Project Roadmap, ES 335 Rubric Navigator, 2 pipeline flowcharts, 10 `Chart.js` graphs, Interactive India Map with 12 pinned forest reserves, Alert Threshold Simulator, and Fire-Weather Physics Sandbox).
+- [`India_Fire_Climate_Intelligence.ipynb`](India_Fire_Climate_Intelligence.ipynb) — Master Google Colab Pro notebook (42 cells, Sections `0–20`) containing all 19 modular Python scripts (`src/ifci/`) and pipeline execution logs.
+- [`FINAL_RESEARCH_REPORT.md`](FINAL_RESEARCH_REPORT.md) — Full 21-section written research report with all tables, error analyses, and ablation studies.
+- [`README.md`](README.md) — Project overview, setup/rebuild guide, data access instructions, AI disclosure, and citations.
 
-### 5.2 External Data, Scientific Literature & Software Citations
-1. **ERA5 Reanalysis:** Hersbach, H., et al. (2020). *The ERA5 global reanalysis*. Quarterly Journal of the Royal Meteorological Society, 146(730), 1999–2049. Copernicus Climate Change Service (C3S) Climate Data Store (CDS).
-2. **NASA FIRMS MODIS Active Fire Product:** Giglio, L., Schroeder, W., & Justice, C. O. (2016). *The collection 6 MODIS active fire detection algorithm and fire products*. Remote Sensing of Environment, 178, 31–41.
-3. **NASA FIRMS VIIRS 375 m Active Fire Product:** Schroeder, W., Oliva, P., Giglio, L., & Csiszar, I. A. (2014). *The New VIIRS 375 m active fire detection data product: Algorithm description and initial assessment*. Remote Sensing of Environment, 143, 85–96.
-4. **Fosberg Fire Weather Index (FFWI):** Fosberg, M. A. (1978). *Weather in wildland fire management: the fire weather index*. In Proceedings of the Conference on Sierra Nevada Meteorology (pp. 1–4). USDA Forest Service.
-5. **Tetens Saturation Vapor Pressure Equation:** Tetens, O. (1930). *Über einige meteorologische Begriffe*. Zeitschrift für Geophysik, 6, 297–309.
-6. **ESA WorldCover / MODIS Land Cover:** Zanaga, D., et al. (2022). *ESA WorldCover 10 m 2021 v200*; Friedl, M., & Sulla-Menashe, D. (2022). *MODIS/Terra+Aqua Land Cover Type Yearly L3 Global 0.05Deg CMG (MCD12C1)*.
-7. **Forest Survey of India (FSI):** *India State of Forest Report (ISFR) 2021 & 2023*, Ministry of Environment, Forest and Climate Change, Government of India.
-8. **Open-Source Software Libraries:** `PyTorch` (Paszke et al., 2019), `LightGBM` (Ke et al., 2017), `XGBoost` (Chen & Guestrin, 2016), `scikit-learn` (Pedregosa et al., 2011), `SHAP` (Lundberg & Lee, 2017), `xarray` (Hoyer & Hamman, 2017), `cfgrib` (ECMWF), `Leaflet.js`, and `Chart.js`.
+### 5.2 Data Access Instructions
+1. **Pre-Computed Web Data (No 21 GB Download Needed to View Website):** All JSON and GeoJSON experimental outputs are embedded directly inside [`index.html`](index.html), so anyone can open the live GitHub Pages link (or double-click `index.html` locally) and use all charts, maps, and simulators immediately.
+2. **Full Raw Dataset Access (For Re-Running in Google Colab Pro):**
+   - **ERA5 GRIB Files (`1947–2026`):** Downloaded from the [Copernicus Climate Data Store (CDS) — ERA5 hourly data on single levels](https://cds.climate.copernicus.eu/) and placed in Google Drive at `/content/drive/MyDrive/machine learning/`.
+   - **NASA FIRMS API Key:** Obtain a free `FIRMS_MAP_KEY` from [https://firms.modaps.eosdis.nasa.gov/api/](https://firms.modaps.eosdis.nasa.gov/api/) and add it to **Google Colab Secrets (`🔑`)** under the name `FIRMS_MAP_KEY`. No API keys or tokens are ever hardcoded in this repository.
+
+### 5.3 How to Run or Rebuild
+- **To View the Website:** Open the live GitHub Pages URL ([https://karthikchandra15.github.io/ML-Project---India_Fire_Climate_Prediction/](https://karthikchandra15.github.io/ML-Project---India_Fire_Climate_Prediction/)) or double-click [`index.html`](index.html) locally.
+- **To Re-Run the Full ML Pipeline:** Open [`India_Fire_Climate_Intelligence.ipynb`](India_Fire_Climate_Intelligence.ipynb) in Google Colab Pro (`T4` GPU, High-RAM), mount Google Drive, set `FIRMS_MAP_KEY` in Colab Secrets, and run Sections `0–20`. Section `20` runs the 7 automated verification checks (`UT-01` through `UT-06` and `IT-01`).
+
+---
+
+## 6. AI-Use Disclosure & Citations (ES 335 Requirement)
+
+### 6.1 AI-Use Disclosure
+In accordance with the **ES 335 (IIT Gandhinagar)** course requirements:
+- **AI Tools Used:** Google Antigravity (Gemini-based coding assistant) was used to help structure the modular Python scripts (`src/ifci/`), optimize memory-safe streaming of the 39 ERA5 GRIB files in Google Colab, fix API pagination and timezone bugs, and build the HTML/Chart.js/Leaflet interactive website layout.
+- **Student Work & Verification:** The problem formulation, chronological split design with 3-day embargo buffer gaps, physical fire-weather features (Tetens VPD, Fosberg FFWI), 5-factor forest vs. crop fire separation rules, full execution of all 20 stages on the real ERA5 and NASA FIRMS datasets in Google Colab Pro, and interpretation of model errors and limitations were done and verified by the authors (`7 / 7` automated verification checks passed).
+
+### 6.2 External Data, Literature & Software Citations
+1. **ERA5 Weather Reanalysis:** Hersbach, H., et al. (2020). *The ERA5 global reanalysis*. Quarterly Journal of the Royal Meteorological Society, 146(730), 1999–2049. Copernicus Climate Change Service (C3S).
+2. **NASA FIRMS MODIS Active Fire Product (1 km):** Giglio, L., Schroeder, W., & Justice, C. O. (2016). *The collection 6 MODIS active fire detection algorithm and fire products*. Remote Sensing of Environment, 178, 31–41.
+3. **NASA FIRMS VIIRS Active Fire Product (375 m):** Schroeder, W., Oliva, P., Giglio, L., & Csiszar, I. A. (2014). *The New VIIRS 375 m active fire detection data product*. Remote Sensing of Environment, 143, 85–96.
+4. **Fosberg Fire Weather Index (FFWI):** Fosberg, M. A. (1978). *Weather in wildland fire management: the fire weather index*. USDA Forest Service.
+5. **Tetens Vapor Pressure Formula:** Tetens, O. (1930). *Über einige meteorologische Begriffe*. Zeitschrift für Geophysik, 6, 297–309.
+6. **Land Cover & Forest Maps:** Zanaga, D., et al. (2022). *ESA WorldCover 10 m*; Friedl, M., & Sulla-Menashe, D. (2022). *MODIS Land Cover (MCD12C1)*; *Forest Survey of India (ISFR 2023)*.
+7. **Software Libraries:** `PyTorch` (Paszke et al., 2019), `LightGBM` (Ke et al., 2017), `XGBoost` (Chen & Guestrin, 2016), `scikit-learn` (Pedregosa et al., 2011), `SHAP` (Lundberg & Lee, 2017), `xarray`, `cfgrib`, `Leaflet.js`, and `Chart.js`.
